@@ -58,3 +58,4 @@
 
 \- MSE越大、SSIM越低代表水印失真越严重。
 
+<img width="906" height="305" alt="image" src="https://github.com/user-attachments/assets/b1323f06-de73-4a7a-b546-10d507e6c04c" />
