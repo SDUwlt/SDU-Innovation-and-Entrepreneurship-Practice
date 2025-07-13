@@ -34,21 +34,21 @@ uint32_t TBOX0[256], TBOX1[256], TBOX2[256], TBOX3[256];
 
 void build_t_tables() {
     for (int i = 0; i < 256; i++) {
-        uint32_t s = SM4_SBOX[i];
-        uint32_t t = linear_transform(s);
-        TBOX0[i] = t << 24;
-        TBOX1[i] = t << 16;
-        TBOX2[i] = t << 8;
-        TBOX3[i] = t;
+        uint8_t s = SM4_SBOX[i];
+        TBOX0[i] = ((uint32_t)s) << 24;
+        TBOX1[i] = ((uint32_t)s) << 16;
+        TBOX2[i] = ((uint32_t)s) << 8;
+        TBOX3[i] = (uint32_t)s;
     }
 }
 
 // ----------- T-Table 查表函数 -----------
 uint32_t T_table(uint32_t x) {
-    return TBOX0[(x >> 24) & 0xFF] ^
-           TBOX1[(x >> 16) & 0xFF] ^
-           TBOX2[(x >> 8) & 0xFF] ^
-           TBOX3[x & 0xFF];
+    uint32_t b = (TBOX0[(x >> 24) & 0xFF] |
+                 TBOX1[(x >> 16) & 0xFF] |
+                 TBOX2[(x >> 8) & 0xFF] |
+                 TBOX3[x & 0xFF]);
+    return linear_transform(b);
 }
 
 // ----------- SM4加密（T-Table版本） -----------
