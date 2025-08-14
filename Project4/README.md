@@ -47,6 +47,18 @@
 | 基础版   | 275 MB/s     |
 | 优化版   | ~380–480 MB/s |
 
+<img width="1400" height="163" alt="image" src="https://github.com/user-attachments/assets/6bd38e6c-a7f4-4f23-8eb9-a2e73243e5fe" />
+
+此外，还可以面向 X86-64 进行进一步提速：
+
+1.利用 lea 合并常量与多操作数加法，比如把 a+b+Tj 折成一条，减少端口压力。
+
+2.BMI2 / 无副作用旋转：在需要右旋的场合用 rorx（或让编译器模式下生成），降低标志位相关的寄存器依赖。
+
+3.SIMD 辅助消息扩展：pshufb 做大端换序与字节洗牌，palignr 拼接窗口，按附件给出的寄存器布局减少「拼接瓶颈」。
+
+4.AVX-512：用 VPROLD 实现单指令循环左移；VPTERNLOGD 以真值表把 A^B^C、FF/ GG 等布尔表达式压成一条指令。
+
 ---
 
 ## 3. Length Extension Attack
@@ -58,4 +70,90 @@ SM3 采用 **Merkle–Damgård 结构**，因此给定：
 - 以及 `|M|`（字节长度）
 
 攻击者可在未知 `M` 内容的情况下构造：
+M || pad(M) || suffix
+并计算其哈希值 `H(M || pad(M) || suffix)` 与合法计算结果一致。
 
+### 实现
+- 从原哈希值恢复中间状态（作为新 IV）。
+- 重现原消息的填充 `pad(M)`。
+- 接着压缩附加数据 `suffix`，得到伪造哈希。
+
+### 实验设置
+- 服务器端持有未知的 `secret`（长度 8 字节）。
+  
+- 已知消息：
+comment=10&uid=1001&role=user
+
+- 已知标签：
+cdb1aee16314187b8542ffae791c40a04088fc20f65afd8c3b02acc11a2fe23b
+
+- 攻击者希望追加：
+&role=admin
+即攻击者希望在不知 secret 的情况下，把 &role=admin 追加到消息末尾，让服务器验证通过。
+
+- 攻击过程：
+攻击者猜测 secret 长度为 8 字节（实际也是 8）。
+根据已知的哈希状态和消息长度，重构 SM3 内部状态，并用 SM3 的 padding 规则继续计算追加部分的哈希。
+生成伪造消息（包含原消息、SM3 的 padding，以及追加的数据）。
+得到新的标签（Forged tag）：
+ef26b5d9a3386f1ddff2867a506a41a85822d85e73e2f33095eebff9bd84165b
+
+- 验证：
+服务器用真正的 secret 对伪造消息重新计算 MAC。
+得到的值和攻击者伪造的 tag 完全一致 → 攻击成功。
+
+<img width="1562" height="788" alt="屏幕截图 2025-08-14 155026" src="https://github.com/user-attachments/assets/9cbbd335-93ed-401e-9f95-e77e181094ff" />
+
+---
+
+## 4. 基于 SM3 的 Merkle 树
+
+### 设计
+遵循 **RFC6962** 的域分离规则：
+- 叶子哈希：
+LeafHash = SM3(0x00 || leaf_data)
+
+- 内部节点：
+NodeHash = SM3(0x01 || left || right)
+
+
+### 功能
+- **构建**：支持 10 万叶节点的大规模 Merkle 树。
+- **存在性证明**：生成从叶到根的兄弟节点路径（Audit Path）。
+- **不存在性证明**：通过前驱/后继的存在性证明证明目标不在集合中。
+
+### 实现说明
+- 构造 100,000 个叶子节点：`leaf-00000000` ~ `leaf-00099999`。
+- 叶子节点哈希：`SM3(leaf_data)`。
+- 父节点哈希：`SM3(left_child_hash || right_child_hash)`。
+- 
+### 资源优化
+- 构建时仅保留两层节点（滚动缓冲）节省内存。
+- 支持多线程并行构建父节点层。
+
+<img width="1517" height="311" alt="屏幕截图 2025-08-14 155045" src="https://github.com/user-attachments/assets/239190dc-8e9a-4372-b56e-116a9f9a1c65" />
+
+从运行结果可以看出：
+成功进行了三种验证，而且都正常通过：
+
+1.构建 Merkle 树
+
+- 生成了 100000 个叶子节点（名字形如 "leaf-000xxxxx"）。
+
+- 打印的 Merkle root 是 47521cc73ccd4ebaeeeeae26f6379544e57ec94c88c065499380a748b840d084，这是树的顶层哈希。
+
+2.成员证明（Inclusion proof）
+
+- 测试了索引 43362 对应的叶子 "leaf-00043362"。
+
+- proof_len=17 表示它需要 17 个兄弟节点哈希来从叶子推到根（符合大约 log2(100000) ≈ 17 的计算）。
+
+- 验证结果是 OK，说明这个叶子确实在树中。
+
+3.非成员证明（Non-membership proof）
+
+- 检查了不存在的 "leaf-99999999"。
+
+- 找到了它在排序中的左邻居 "leaf-00099999"，也有 17 层证明链，验证成功 (OK)。
+
+-因为它应该排在最后一个叶子之后，所以没有右邻居（符合逻辑）。
