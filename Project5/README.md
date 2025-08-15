@@ -43,6 +43,8 @@
 - 检查 r=0、s=0、r+k=n 等边界条件，必要时重采样 k
 - 严格绑定 ZA 与公钥，防止公钥恢复攻击
 
+<img width="1702" height="199" alt="屏幕截图 2025-08-14 232747" src="https://github.com/user-attachments/assets/669a1cd0-f87a-4304-8d23-f836a1d53b56" />
+
 ---
 
 ## 4. POC 攻击实验与公式推导
@@ -50,26 +52,19 @@
 ### 4.1 Demo 1：一次性随机数 k 泄漏
 
 **签名公式**：
-\[
-s = (k - r d) (1 + d)^{-1} \pmod{n}
-\]
+$s = (k - r d) (1 + d)^{-1} \pmod{n}$
 
-**已知**：\( r, s, k \)  
-**要求**：求 \( d \)  
+**已知**：r, s, k
+**要求**：求  d 
 
 **推导**：
-\[
-s(1+d) \equiv k - r d \pmod{n}
-\]
-\[
-s + s d \equiv k - r d
-\]
-\[
-s - k \equiv -d (s + r)
-\]
-\[
-d \equiv (k - s) (s + r)^{-1} \pmod{n}
-\]
+$s(1+d) \equiv k - r d \pmod{n}$
+
+$s + s d \equiv k - r d$
+
+$s - k \equiv -d (s + r)$
+
+$d \equiv (k - s) (s + r)^{-1} \pmod{n}$
 
 **实验结果**：
 
@@ -82,24 +77,18 @@ orig d == rec d ? True
 ### 4.2 Demo 2：同一用户复用同一 k
 
 消息 1：
-\[
-s_1 = (k - r_1 d)(1+d)^{-1} \pmod{n}
-\]
+$s_1 = (k - r_1 d)(1+d)^{-1} \pmod{n}$
+
 消息 2：
-\[
-s_2 = (k - r_2 d)(1+d)^{-1} \pmod{n}
-\]
+$s_2 = (k - r_2 d)(1+d)^{-1} \pmod{n}$
 
 相减：
-\[
-(s_1 - s_2)(1+d) \equiv (r_2 - r_1) d
-\]
-\[
-s_1 - s_2 \equiv d (r_2 - r_1 - (s_1 - s_2))
-\]
-\[
-d \equiv (s_2 - s_1) (s_1 - s_2 + r_1 - r_2)^{-1} \pmod{n}
-\]
+$(s_1 - s_2)(1+d) \equiv (r_2 - r_1) d$
+
+$s_1 - s_2 \equiv d (r_2 - r_1 - (s_1 - s_2))$
+
+$d \equiv (s_2 - s_1) (s_1 - s_2 + r_1 - r_2)^{-1} \pmod{n}$
+
 
 **实验结果**：
 == Demo 2: reuse k same user on two messages
@@ -111,17 +100,12 @@ orig d2 == rec d2 ? True
 ### 4.3 Demo 3：两个用户复用同一 k（k 已知）
 
 用户 A：
-\[
-s_A = (k - r_A d_A)(1+d_A)^{-1}
-\]
-\[
-d_A \equiv (k - s_A) (s_A + r_A)^{-1} \pmod{n}
-\]
+$s_A = (k - r_A d_A)(1+d_A)^{-1}$
+
+$d_A \equiv (k - s_A) (s_A + r_A)^{-1} \pmod{n}$
 
 用户 B 同理：
-\[
-d_B \equiv (k - s_B) (s_B + r_B)^{-1} \pmod{n}
-\]
+$d_B \equiv (k - s_B) (s_B + r_B)^{-1} \pmod{n}$
 
 **实验结果**：
 == Demo 3: two users accidentally reuse k (k known)
@@ -134,39 +118,31 @@ recover B ok? True
 ### 4.4 Demo 4：同一 d 和 k 用于 ECDSA 与 SM2
 
 ECDSA 签名：
-\[
-s_1 = k^{-1}(e_1 + r_1 d) \pmod{n}
-\]
-\[
-k \equiv s_1^{-1}(e_1 + r_1 d) \pmod{n}
-\]
+$s_1 = k^{-1}(e_1 + r_1 d) \pmod{n}$
+
+$k \equiv s_1^{-1}(e_1 + r_1 d) \pmod{n}$
+
 
 SM2 签名：
-\[
-s_2 = (k - r_2 d)(1+d)^{-1}
-\]
-\[
-k \equiv s_2(1+d) + r_2 d
-\]
+$s_2 = (k - r_2 d)(1+d)^{-1}$
+
+$k \equiv s_2(1+d) + r_2 d$
 
 令两式相等：
-\[
-s_1^{-1}(e_1 + r_1 d) \equiv s_2 + s_2 d + r_2 d
-\]
-\[
-e_1 + r_1 d \equiv s_1 s_2 + s_1 s_2 d + s_1 r_2 d
-\]
-\[
-e_1 - s_1 s_2 \equiv d (s_1 s_2 + s_1 r_2 - r_1)
-\]
-\[
-d \equiv (s_1 s_2 - e_1) (r_1 - s_1 s_2 - s_1 r_2)^{-1} \pmod{n}
-\]
+$s_1^{-1}(e_1 + r_1 d) \equiv s_2 + s_2 d + r_2 d$
+
+$e_1 + r_1 d \equiv s_1 s_2 + s_1 s_2 d + s_1 r_2 d$
+
+$e_1 - s_1 s_2 \equiv d (s_1 s_2 + s_1 r_2 - r_1)$
+
+$d \equiv (s_1 s_2 - e_1) (r_1 - s_1 s_2 - s_1 r_2)^{-1} \pmod{n}$
+
 
 **实验结果**：
 == Demo 4: same d & k used for ECDSA and SM2
 orig d == rec d ? True
 
+<img width="1024" height="364" alt="image" src="https://github.com/user-attachments/assets/d9be00ea-a6a4-48fa-bf98-13524ff9ec5e" />
 
 ---
 
