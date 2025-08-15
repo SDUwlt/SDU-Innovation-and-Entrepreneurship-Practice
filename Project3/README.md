@@ -105,12 +105,14 @@ template Pow5() {
     out <== in * x4; // x^5
 }
 ```
+
 ## 编译与证明流程
 1. 编译电路
 
 ```bash
 circom Poseidon2.circom --r1cs --wasm --sym -o build
 ```
+<img width="1556" height="603" alt="屏幕截图 2025-08-15 163830" src="https://github.com/user-attachments/assets/d1356537-10fd-4e10-a0a6-771fe9271efc" />
 
 生成文件：
 
@@ -166,3 +168,5 @@ snarkjs groth16 verify verification_key.json public.json proof.json
 ```
 
 成功验证后，proof.json 和 public.json 可用于链上或其他验证环境。
+
+<img width="2120" height="128" alt="屏幕截图 2025-08-15 165906" src="https://github.com/user-attachments/assets/03df8d3a-8dbe-4eea-86d9-348ff10b2812" />
