@@ -161,3 +161,134 @@ orig d == rec d ? True
 4. **绑定 ZA 与公钥**
 5. **在硬件安全模块（HSM）中生成和保存私钥与 k**
 
+## 7. 伪造中本聪的签名
+
+基于secp256k1椭圆曲线实现中本聪风格的比特币数字签名
+
+## 功能概述
+
+- 生成比特币兼容的私钥/公钥对
+- 将私钥转换为WIF(钱包导入格式)
+- 从公钥生成比特币地址
+- 对消息进行ECDSA签名
+- 验证签名有效性
+- 输出DER编码格式签名
+
+## 算法细节
+
+### 1. 椭圆曲线参数 (secp256k1)
+
+
+P = 2**256 - 2**32 - 977  # 有限域质数
+
+N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141  # 曲线阶数
+
+A = 0  # 曲线方程 y² = x³ + 7
+
+B = 7
+
+Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798  # 生成点x
+
+Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8  # 生成点y
+
+
+### 2. 密钥生成流程
+私钥生成:
+
+生成256位随机整数
+
+范围: 1 ≤ priv_key < N
+
+公钥派生:
+
+PubKey = privKey × G
+
+G为曲线生成点
+×表示椭圆曲线标量乘法
+
+### 3. 地址生成流程
+
+- 公钥序列化(压缩/非压缩格式)
+
+- SHA256哈希
+
+- RIPEMD160哈希
+
+- 添加版本字节(0x00)
+
+- 计算校验和(SHA256(SHA256(data)))
+
+- Base58编码
+
+### 4. ECDSA签名算法
+   
+签名生成:
+
+  ### ECDSA 签名生成
+给定: 私钥 `d`，消息 `m`，随机数 `k`
+1. 计算 `e = SHA256(m)`
+2. 计算 `(x₁, y₁) = k × G`
+3. `r = x₁ mod n`
+4. `s = k⁻¹ (e + r × d) mod n`
+5. 如果 `s > n/2`，取 `s = n - s`（低 s 值）
+6. 返回签名 `(r, s)`
+
+---
+
+### ECDSA 签名验证
+给定: 公钥 `Q`，消息 `m`，签名 `(r, s)`
+1. 验证 `1 ≤ r, s < n`
+2. 计算 `e = SHA256(m)`
+3. 计算 `w = s⁻¹ mod n`
+4. 计算 `u₁ = e × w mod n`，`u₂ = r × w mod n`
+5. 计算 `(x₁, y₁) = u₁ × G + u₂ × Q`
+6. 验证 `r ≡ x₁ mod n`
+
+---
+
+### DER 编码格式
+
+30 [长度] 02 [r长度] [r值] 02 [s长度] [s值]
+
+- 所有整数采用大端格式
+
+- 去除前导零字节
+
+- 若最高位为1，需添加前导00字节
+
+### 5.代码结构
+```python
+class ECPoint:
+    # 椭圆曲线点实现
+    def __add__()    # 点加法
+    def double()     # 点倍乘
+    def __rmul__()   # 标量乘法
+
+# 辅助函数
+modinv()            # 模逆计算
+sha256()            # 哈希函数
+base58_encode()     # Base58编码
+
+# 主要功能
+generate_private_key()
+private_key_to_public_key()
+private_key_to_wif()
+public_key_to_address()
+ecdsa_sign()
+ecdsa_verify()
+signature_to_der()
+```
+
+# 使用示例
+
+```python
+# 生成中本聪风格签名
+priv_key = generate_private_key()
+pub_point = private_key_to_public_key(priv_key)
+address = public_key_to_address(pub_point)
+message = "The Times 03/Jan/2009..."
+r, s = ecdsa_sign(priv_key, message)
+der_sig = signature_to_der(r, s)
+is_valid = ecdsa_verify(pub_point, message, (r, s))
+```
+<img width="1706" height="429" alt="image" src="https://github.com/user-attachments/assets/bcc82dde-7462-4e64-8b32-0c0e97490a63" />
